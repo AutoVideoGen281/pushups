@@ -1,0 +1,5 @@
+{
+  "name": "Push-Up Pro",
+  "description": "A daily push-up training app that provides personalized workouts to build strength. It features a streak system, progress tracking via local storage, and a unique rep-counting mechanism. The sleek, modern design is mobile-friendly.",
+  "requestFramePermissions": []
+}
