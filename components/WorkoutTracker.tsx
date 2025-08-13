@@ -24,6 +24,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
   const [countdown, setCountdown] = useState(REST_DURATION);
   
   const finishSetInProgress = useRef(false);
+  const isPressing = useRef(false);
 
   const isPRMode = mode === 'pr';
   const currentTargetReps = isPRMode ? Infinity : workout[currentSetIndex]?.targetReps;
@@ -80,11 +81,30 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     }
   }, [isResting, startNextSet]);
 
-  const handleRep = () => {
+  const handlePressStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
     if (isResting || finishSetInProgress.current) return;
-    setCurrentReps(prev => prev + 1);
+    isPressing.current = true;
     setRepFeedback(true);
-    setTimeout(() => setRepFeedback(false), 150);
+  };
+
+  const handlePressEnd = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (isPressing.current) {
+      isPressing.current = false;
+      setRepFeedback(false);
+      if (isResting || finishSetInProgress.current) {
+        return;
+      }
+      setCurrentReps(prev => prev + 1);
+    }
+  };
+  
+  const handlePressCancel = () => {
+    if (isPressing.current) {
+      isPressing.current = false;
+      setRepFeedback(false);
+    }
   };
   
   return (
@@ -118,9 +138,13 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
           </div>
 
           <div
-            onMouseDown={handleRep}
-            onTouchStart={handleRep}
-            className={`w-full h-64 sm:h-80 max-w-sm bg-gray-900 rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none border-2 border-gray-800 transition-all duration-150 ${repFeedback ? 'bg-white/10 scale-105 border-white' : 'active:scale-95'}`}
+            onMouseDown={handlePressStart}
+            onTouchStart={handlePressStart}
+            onMouseUp={handlePressEnd}
+            onTouchEnd={handlePressEnd}
+            onMouseLeave={handlePressCancel}
+            onTouchCancel={handlePressCancel}
+            className={`w-full h-64 sm:h-80 max-w-sm bg-gray-900 rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none border-2 border-gray-800 transition-all duration-150 ${repFeedback ? 'bg-white/10 scale-105 border-white' : ''}`}
           >
             <span className="text-8xl sm:text-9xl font-black text-white transition-transform">{currentReps}</span>
             <p className="text-gray-400 font-bold text-lg -mt-2">TAP TO COUNT</p>
