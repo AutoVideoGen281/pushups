@@ -4,23 +4,14 @@
   "description": "A daily push-up training app that provides personalized workouts to build strength.",
   "icons": [
     {
-      "src": "/public/icon.svg",
+      "src": "/icon.svg",
       "type": "image/svg+xml",
-      "sizes": "any"
-    },
-    {
-      "src": "/public/icons/icon-192x192.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "/public/icons/icon-512x512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "any",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#000000",
+  "background_color": "#ffffff",
   "display": "standalone",
   "scope": "/",
   "theme_color": "#000000"
