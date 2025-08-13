@@ -106,9 +106,18 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
       setRepFeedback(false);
     }
   };
+
+  const handleFinishClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    finishSet();
+  };
+
+  const stopPropagation = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+  };
   
   return (
-    <div className="w-full flex flex-col items-center justify-center text-center p-4">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-center p-4 animate-fade-in">
       {isResting ? (
         <div className="flex flex-col items-center gap-6 animate-fade-in">
             <h2 className="text-3xl font-bold text-gray-400">Set {currentSetIndex + 1} Complete!</h2>
@@ -127,36 +136,39 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             </button>
         </div>
       ) : (
-        <>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-400">
+        <div 
+          className="w-full h-full flex flex-col justify-center items-center cursor-pointer select-none relative"
+          onMouseDown={handlePressStart}
+          onTouchStart={handlePressStart}
+          onMouseUp={handlePressEnd}
+          onTouchEnd={handlePressEnd}
+          onMouseLeave={handlePressCancel}
+          onTouchCancel={handlePressCancel}
+        >
+          <div className="absolute top-4 text-center">
+            <h2 className="text-2xl font-bold text-gray-500">
               {isPRMode ? 'Max Push-Up Test' : `Set ${currentSetIndex + 1} of ${workout.length}`}
             </h2>
             {!isPRMode && (
-              <p className="text-xl text-gray-500">Target: {currentTargetReps} reps</p>
+              <p className="text-xl text-gray-600">Target: {currentTargetReps} reps</p>
             )}
           </div>
-
-          <div
-            onMouseDown={handlePressStart}
-            onTouchStart={handlePressStart}
-            onMouseUp={handlePressEnd}
-            onTouchEnd={handlePressEnd}
-            onMouseLeave={handlePressCancel}
-            onTouchCancel={handlePressCancel}
-            className={`w-full h-64 sm:h-80 max-w-sm bg-gray-900 rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none border-2 border-gray-800 transition-all duration-150 ${repFeedback ? 'bg-white/10 scale-105 border-white' : ''}`}
-          >
-            <span className="text-8xl sm:text-9xl font-black text-white transition-transform">{currentReps}</span>
-            <p className="text-gray-400 font-bold text-lg -mt-2">TAP TO COUNT</p>
+          
+          <div className={`transition-transform duration-150 ${repFeedback ? 'scale-110' : 'scale-100'}`}>
+            <span className="text-[12rem] sm:text-[16rem] font-black text-white leading-none tracking-tighter">{currentReps}</span>
           </div>
 
-          <button
-            onClick={finishSet}
-            className="mt-8 w-full max-w-xs bg-gray-800 border border-gray-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300"
-          >
-            {isPRMode ? 'Finish & Save PR' : (currentSetIndex >= workout.length - 1 ? 'Finish Workout' : 'Finish Set')}
-          </button>
-        </>
+          {isPRMode && (
+             <div className="absolute bottom-4 w-full max-w-xs" onMouseDown={stopPropagation} onTouchStart={stopPropagation}>
+                <button
+                onClick={handleFinishClick}
+                className="w-full bg-gray-800 border border-gray-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300"
+                >
+                Finish & Save PR
+                </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
