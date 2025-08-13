@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { WorkoutSet } from '../types';
 
 interface WorkoutTrackerProps {
@@ -7,27 +7,39 @@ interface WorkoutTrackerProps {
   onComplete: (completedSets: WorkoutSet[]) => void;
 }
 
-const REST_DURATION = 120; // 2 minutes in seconds
+const REST_DURATION = 105; // 1 minute 45 seconds
+
+const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60).toString();
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+};
 
 const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'workout', onComplete }) => {
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [currentReps, setCurrentReps] = useState(0);
   const [completedSets, setCompletedSets] = useState<WorkoutSet[]>([]);
   const [isResting, setIsResting] = useState(false);
-  const [restTimeLeft, setRestTimeLeft] = useState(REST_DURATION);
   const [repFeedback, setRepFeedback] = useState(false);
+  const [countdown, setCountdown] = useState(REST_DURATION);
+  
+  const finishSetInProgress = useRef(false);
 
   const isPRMode = mode === 'pr';
   const currentTargetReps = isPRMode ? Infinity : workout[currentSetIndex]?.targetReps;
-
+  
   const startNextSet = useCallback(() => {
+      finishSetInProgress.current = false;
       setCurrentSetIndex(prev => prev + 1);
       setCurrentReps(0);
       setIsResting(false);
-      setRestTimeLeft(REST_DURATION);
+      setCountdown(REST_DURATION);
   }, []);
-  
+
   const finishSet = useCallback(() => {
+    if (finishSetInProgress.current) return;
+    finishSetInProgress.current = true;
+    
     const finalSets = [...completedSets, { 
       targetReps: isPRMode ? 0 : currentTargetReps, 
       completedReps: currentReps 
@@ -39,45 +51,42 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     } else {
       setIsResting(true);
     }
-  }, [completedSets, currentReps, currentSetIndex, workout, isPRMode, onComplete, currentTargetReps]);
+  }, [completedSets, currentReps, currentSetIndex, currentTargetReps, isPRMode, onComplete, workout.length]);
 
+  // Auto-finish set when target reps are met
+  useEffect(() => {
+    if (!isPRMode && currentReps > 0 && currentReps >= currentTargetReps) {
+      const timer = setTimeout(() => {
+        finishSet();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [currentReps, currentTargetReps, isPRMode, finishSet]);
+  
+  // Rest timer countdown
   useEffect(() => {
     if (isResting) {
-      const timer = setInterval(() => {
-        setRestTimeLeft(prevTime => {
-          if (prevTime <= 1) {
-            clearInterval(timer);
+      const interval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
             startNextSet();
-            return 0;
+            return REST_DURATION;
           }
-          return prevTime - 1;
+          return prev - 1;
         });
       }, 1000);
-
-      return () => clearInterval(timer);
+      return () => clearInterval(interval);
     }
   }, [isResting, startNextSet]);
-  
+
   const handleRep = () => {
-    if (isResting) return;
-    
-    const newReps = currentReps + 1;
-    setCurrentReps(newReps);
+    if (isResting || finishSetInProgress.current) return;
+    setCurrentReps(prev => prev + 1);
     setRepFeedback(true);
     setTimeout(() => setRepFeedback(false), 150);
-
-    if (!isPRMode && newReps >= currentTargetReps) {
-        // Use a tiny timeout to allow the rep count to update visually before finishing the set
-        setTimeout(() => finishSet(), 200);
-    }
   };
   
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
   return (
     <div className="w-full flex flex-col items-center justify-center text-center p-4">
       {isResting ? (
@@ -85,16 +94,16 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             <h2 className="text-3xl font-bold text-gray-400">Set {currentSetIndex + 1} Complete!</h2>
             <p className="text-6xl font-black text-white">{currentReps} <span className="text-2xl font-bold text-gray-500">REPS</span></p>
             
-            <div className="my-4">
-              <p className="text-xl text-gray-300 mb-2">Rest Time</p>
-              <p className="text-7xl font-mono font-black text-white">{formatTime(restTimeLeft)}</p>
+            <div className="text-center my-2">
+                <p className="text-lg text-gray-300">Rest up! Next set in...</p>
+                <p className="text-7xl font-mono font-black text-white tracking-tighter">{formatTime(countdown)}</p>
             </div>
             
             <button
                 onClick={startNextSet}
-                className="w-full max-w-xs bg-gray-800 border border-gray-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300 text-base"
+                className="w-full max-w-xs bg-white text-black font-bold py-4 px-6 rounded-xl hover:bg-gray-200 transition-all duration-300 text-lg shadow-lg shadow-white/10"
             >
-                Skip Rest & Start Next
+                Skip Rest & Start Set {currentSetIndex + 2}
             </button>
         </div>
       ) : (
@@ -121,7 +130,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             onClick={finishSet}
             className="mt-8 w-full max-w-xs bg-gray-800 border border-gray-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300"
           >
-            {isPRMode ? 'Finish & Save PR' : (currentSetIndex >= workout.length - 1 ? 'Finish Workout' : 'I\'m Done, Finish Set')}
+            {isPRMode ? 'Finish & Save PR' : (currentSetIndex >= workout.length - 1 ? 'Finish Workout' : 'Finish Set')}
           </button>
         </>
       )}

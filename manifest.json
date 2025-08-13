@@ -1,18 +1,28 @@
 {
-  "short_name": "Push-Up Pro",
   "name": "Push-Up Pro",
-  "description": "A daily push-up training app that provides personalized workouts to build strength.",
+  "short_name": "Push-Up Pro",
+  "description": "Your personal push-up training partner to build strength and consistency.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#111827",
+  "scope": "/",
   "icons": [
     {
       "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
       "type": "image/svg+xml",
-      "sizes": "any",
       "purpose": "any maskable"
     }
-  ],
-  "start_url": "/",
-  "background_color": "#ffffff",
-  "display": "standalone",
-  "scope": "/",
-  "theme_color": "#000000"
+  ]
 }

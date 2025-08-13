@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ProgressData, WorkoutSet } from './types';
+import { ProgressData, WorkoutSet, DailyLog, PRHistoryItem } from './types';
 import { LOCAL_STORAGE_KEY } from './constants';
 import InitialView from './components/InitialView';
 import WorkoutTracker from './components/WorkoutTracker';
-import CompletedScreen from './components/CompletedScreen';
-import StatusHeader from './components/StatusHeader';
-import StartDayView from './components/StartDayView';
+import Dashboard from './components/Dashboard';
 
-type ViewMode = 'loading' | 'initial' | 'start_day' | 'workout' | 'pr_test' | 'completed';
+type ViewMode = 'loading' | 'initial' | 'dashboard' | 'workout' | 'pr_test';
 
 const isSameDay = (date1: Date, date2: Date): boolean => {
     return date1.toDateString() === date2.toDateString();
@@ -28,14 +26,12 @@ const generateWorkoutFromPR = (pr: number): WorkoutSet[] => {
 };
 
 const generateNextWorkout = (previousWorkout: WorkoutSet[]): WorkoutSet[] => {
-    const newWorkout = previousWorkout.map(set => ({ ...set, targetReps: set.targetReps, completedReps: 0 }));
+    const newWorkout = previousWorkout.map(set => ({ ...set, completedReps: 0, targetReps: set.targetReps }));
     if (newWorkout.length === 0) return [];
-    // Increase target reps on a random set
     const randomIndex = Math.floor(Math.random() * newWorkout.length);
     newWorkout[randomIndex].targetReps += 1;
     return newWorkout;
 };
-
 
 export default function App() {
     const [progress, setProgress] = useState<ProgressData | null>(null);
@@ -45,35 +41,41 @@ export default function App() {
         try {
             const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (savedData) {
-                const data: ProgressData = JSON.parse(savedData);
+                let data: ProgressData = JSON.parse(savedData);
+
+                // Migration for users without prHistory
+                if (!data.prHistory) {
+                    data.prHistory = data.maxPR > 0 ? [{ date: data.history[0]?.date || new Date().toISOString(), pr: data.maxPR }] : [];
+                }
+                
                 const today = new Date();
                 const lastWorkoutDate = data.lastWorkoutDate ? new Date(data.lastWorkoutDate) : null;
+                
+                // If it's a new day, generate the next workout
+                if (lastWorkoutDate && !isSameDay(lastWorkoutDate, today)) {
+                    let workout: WorkoutSet[];
+                    let streak = data.streak;
 
-                if (lastWorkoutDate && isSameDay(lastWorkoutDate, today)) {
-                    // Already trained today
-                    setProgress(data);
-                    setViewMode('completed');
-                } else { 
-                    // New day, show start screen before workout
-                    const streakShouldContinue = lastWorkoutDate && isYesterday(lastWorkoutDate, today);
-                    const newStreak = streakShouldContinue ? data.streak : 0;
-                    
-                    const lastWorkoutPlan = data.currentWorkout;
-
-                    const nextWorkout = streakShouldContinue 
-                        ? generateNextWorkout(lastWorkoutPlan)
-                        : generateWorkoutFromPR(data.maxPR);
-                    
-                    const updatedData = { ...data, streak: newStreak, currentWorkout: nextWorkout };
+                    if (isYesterday(lastWorkoutDate, today)) {
+                        workout = generateNextWorkout(data.currentWorkout);
+                    } else {
+                        // Streak broken
+                        workout = generateWorkoutFromPR(data.maxPR);
+                        streak = 0;
+                    }
+                    const updatedData = { ...data, streak, currentWorkout: workout.map(s => ({...s, completedReps: 0})) };
                     setProgress(updatedData);
-                    setViewMode('start_day');
+                } else {
+                    setProgress(data);
                 }
+                
+                setViewMode('dashboard');
             } else {
-                // First time user
                 setViewMode('initial');
             }
         } catch (error) {
             console.error("Failed to load or process data:", error);
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
             setViewMode('initial');
         }
     }, []);
@@ -96,43 +98,40 @@ export default function App() {
             lastWorkoutDate: null,
             currentWorkout: newWorkout,
             history: [],
+            prHistory: [{ date: new Date().toISOString(), pr: pr }],
         };
         saveData(newData);
-        setViewMode('start_day');
+        setViewMode('dashboard');
     };
     
     const handlePRTestComplete = (pr: number) => {
         if (!progress || pr <= 0) return;
-        const newWorkout = generateWorkoutFromPR(pr);
         const updatedData: ProgressData = {
             ...progress,
-            maxPR: pr,
-            currentWorkout: newWorkout,
+            maxPR: Math.max(progress.maxPR, pr),
+            prHistory: [...progress.prHistory, { date: new Date().toISOString(), pr }],
         };
         saveData(updatedData);
-        setViewMode('workout');
+        setViewMode('dashboard');
     };
 
     const handleWorkoutComplete = (completedSets: WorkoutSet[]) => {
         if (!progress) return;
         const today = new Date();
-        const newLog: any = { date: today.toISOString(), sets: completedSets };
+        const newLog: DailyLog = { date: today.toISOString(), sets: completedSets };
         
         const updatedData: ProgressData = {
             ...progress,
             lastWorkoutDate: today.toISOString(),
             streak: progress.streak + 1,
             history: [...progress.history, newLog],
-            currentWorkout: completedSets
+            currentWorkout: completedSets,
         };
         saveData(updatedData);
-        setViewMode('completed');
+        setViewMode('dashboard');
     };
     
-    const handleStartWorkout = () => {
-        setViewMode('workout');
-    };
-
+    const startWorkout = () => setViewMode('workout');
     const startPRTest = () => setViewMode('pr_test');
 
     const renderContent = () => {
@@ -141,9 +140,6 @@ export default function App() {
                 return <div className="text-2xl font-bold">Loading...</div>;
             case 'initial':
                 return <InitialView onSave={handleInitialPR} />;
-            case 'start_day':
-                 if (!progress) return <InitialView onSave={handleInitialPR} />;
-                 return <StartDayView workout={progress.currentWorkout} onStart={handleStartWorkout} />;
             case 'workout':
                 if (!progress) return <InitialView onSave={handleInitialPR} />;
                 return (
@@ -161,23 +157,23 @@ export default function App() {
                         onComplete={(sets) => handlePRTestComplete(sets[0].completedReps)}
                     />
                 );
-            case 'completed':
-                if (!progress) return <InitialView onSave={handleInitialPR} />;
-                return <CompletedScreen progress={progress} />;
             default:
-                return <div>Error</div>;
+                 return <div className="text-2xl font-bold">Loading...</div>;
         }
     };
 
     return (
-        <main className="bg-black text-gray-100 min-h-screen w-full flex flex-col items-center justify-between p-4 sm:p-6 font-sans">
-             <div className="w-full max-w-md">
-                {viewMode !== 'initial' && progress && <StatusHeader progress={progress} onPRTestClick={startPRTest} />}
+        <main className="bg-black text-gray-100 min-h-screen w-full flex flex-col items-center p-4 sm:p-6 font-sans">
+            <div className="w-full flex-grow">
+                {viewMode === 'dashboard' && progress ? (
+                    <Dashboard progress={progress} onStartWorkout={startWorkout} onStartPRTest={startPRTest} />
+                ) : (
+                    <div className="flex-grow flex items-center justify-center h-full max-w-md mx-auto">
+                        {renderContent()}
+                    </div>
+                )}
             </div>
-            <div className="flex-grow flex items-center justify-center w-full max-w-md">
-                {renderContent()}
-            </div>
-            <footer className="w-full text-center p-4">
+            <footer className="w-full text-center p-4 mt-auto shrink-0">
                 <p className="text-gray-600 text-sm">Push-Up Pro &copy; {new Date().getFullYear()}</p>
             </footer>
         </main>
