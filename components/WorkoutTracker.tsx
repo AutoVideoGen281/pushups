@@ -107,11 +107,6 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     }
   };
 
-  const handleFinishClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    finishSet();
-  };
-
   const stopPropagation = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
   };
@@ -159,12 +154,18 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
           </div>
 
           {isPRMode && (
-             <div className="absolute bottom-4 w-full max-w-xs" onMouseDown={stopPropagation} onTouchStart={stopPropagation}>
+             <div 
+                className="absolute bottom-4 w-full max-w-xs" 
+                onMouseDown={stopPropagation} 
+                onTouchStart={stopPropagation}
+                onMouseUp={stopPropagation}
+                onTouchEnd={stopPropagation}
+             >
                 <button
-                onClick={handleFinishClick}
-                className="w-full bg-gray-800 border border-gray-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300"
+                  onClick={finishSet}
+                  className="w-full bg-gray-800 border border-gray-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-300"
                 >
-                Finish & Save PR
+                  Finish & Save PR
                 </button>
             </div>
           )}
