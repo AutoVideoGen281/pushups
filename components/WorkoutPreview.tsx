@@ -1,8 +1,8 @@
 import React from 'react';
-import { WorkoutSet } from '../types';
+import { RepWorkoutSet } from '../types';
 
 interface WorkoutPreviewProps {
-  workout: WorkoutSet[];
+  workout: RepWorkoutSet[];
   onStart: () => void;
 }
 
