@@ -52,7 +52,10 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     
     if (isTiming) {
         setIsTiming(false);
-        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
     }
     
     let newSet: WorkoutSetUnion;
@@ -82,12 +85,10 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     if (isPRMode || currentValue === 0 || currentValue < currentTarget) return;
 
     if (isDurationBased) {
-      // For duration-based workouts (planks), finish as soon as the target is met.
       if (isTiming) {
         finishSet();
       }
     } else {
-      // For rep-based workouts, finish with a small delay.
       const timer = setTimeout(() => {
         finishSet();
       }, 300);
@@ -110,16 +111,29 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
       return () => clearInterval(interval);
     }
   }, [isResting, startNextSet]);
+  
+  const startTimer = useCallback(() => {
+    if (isTiming || isResting) return;
+    setIsTiming(true);
+    const startTime = Date.now() - currentValue * 1000;
+    timerIntervalRef.current = window.setInterval(() => {
+        setCurrentValue(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+  }, [isTiming, isResting, currentValue]);
+
+  useEffect(() => {
+    if (isDurationBased && !isPRMode && !isResting) {
+      const autoStartTimer = setTimeout(() => startTimer(), 500); // Brief delay
+      return () => clearTimeout(autoStartTimer);
+    }
+  }, [currentSetIndex, isDurationBased, isPRMode, isResting, startTimer]);
+
 
   const handlePress = () => {
     if (isDurationBased) {
-        if (!isTiming) { // Only start timer, don't allow stopping for regular workouts
-            setIsTiming(true);
-            setFeedback(true);
-            const startTime = Date.now() - currentValue * 1000;
-            timerIntervalRef.current = window.setInterval(() => {
-                setCurrentValue(Math.floor((Date.now() - startTime) / 1000));
-            }, 1000);
+        // Only for manual start in PR mode
+        if (!isTiming) {
+            startTimer();
         }
     } else {
         // Rep counting logic
@@ -160,7 +174,8 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
   const handleMainAreaClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     if (isResting || finishSetInProgress.current) return;
-    if (isDurationBased) {
+    // Manual start only for PR mode planks
+    if (isDurationBased && isPRMode) {
       handlePress();
     }
   };
@@ -206,13 +221,13 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             )}
           </div>
           
-          <div className={`transition-transform duration-150 ${feedback ? 'scale-110' : 'scale-100'}`}>
+          <div className={`transition-transform duration-150 ${feedback || (isDurationBased && isTiming) ? 'scale-110' : 'scale-100'}`}>
             <span className="text-[10rem] sm:text-[14rem] font-black text-white leading-none tracking-tighter font-mono">
                 {isDurationBased ? formatTime(currentValue) : currentValue}
             </span>
           </div>
           {isDurationBased && (
-              <p className="text-2xl font-bold text-gray-400 mt-4">{isTiming ? 'Timing...' : 'Tap to start'}</p>
+              <p className="text-2xl font-bold text-gray-400 mt-4">{isTiming ? 'Hold!' : isPRMode ? 'Tap to start' : 'Get Ready...'}</p>
           )}
 
           {isPRMode && (
