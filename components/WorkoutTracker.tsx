@@ -52,7 +52,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     
     if (isTiming) {
         setIsTiming(false);
-        clearInterval(timerIntervalRef.current!);
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
     
     let newSet: WorkoutSetUnion;
@@ -77,15 +77,23 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
     }
   }, [completedSets, currentValue, currentSetIndex, isPRMode, onComplete, workout.length, isTiming, isDurationBased, currentSet]);
 
-  // Auto-finish set for rep-based workouts
+  // Auto-finish set when target is reached
   useEffect(() => {
-    if (!isPRMode && !isDurationBased && currentValue > 0 && currentValue >= currentTarget) {
+    if (isPRMode || currentValue === 0 || currentValue < currentTarget) return;
+
+    if (isDurationBased) {
+      // For duration-based workouts (planks), finish as soon as the target is met.
+      if (isTiming) {
+        finishSet();
+      }
+    } else {
+      // For rep-based workouts, finish with a small delay.
       const timer = setTimeout(() => {
         finishSet();
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [currentValue, currentTarget, isPRMode, finishSet, isDurationBased]);
+  }, [currentValue, currentTarget, isPRMode, isDurationBased, isTiming, finishSet]);
   
   useEffect(() => {
     if (isResting) {
@@ -105,11 +113,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
 
   const handlePress = () => {
     if (isDurationBased) {
-        if (isTiming) { // Stop timer
-            setIsTiming(false);
-            clearInterval(timerIntervalRef.current!);
-            setFeedback(false);
-        } else { // Start timer
+        if (!isTiming) { // Only start timer, don't allow stopping for regular workouts
             setIsTiming(true);
             setFeedback(true);
             const startTime = Date.now() - currentValue * 1000;
@@ -118,7 +122,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             }, 1000);
         }
     } else {
-        // Rep counting logic remains mostly the same
+        // Rep counting logic
         isPressing.current = true;
         setFeedback(true);
     }
@@ -136,7 +140,7 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
   const handleInteractionStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     if (isResting || finishSetInProgress.current) return;
-    if (isDurationBased) return; // Duration handled by unified tap
+    if (isDurationBased) return;
     handlePress();
   };
 
@@ -208,10 +212,10 @@ const WorkoutTracker: React.FC<WorkoutTrackerProps> = ({ workout = [], mode = 'w
             </span>
           </div>
           {isDurationBased && (
-              <p className="text-2xl font-bold text-gray-400 mt-4">{isTiming ? 'Timing...' : 'Tap to start/stop'}</p>
+              <p className="text-2xl font-bold text-gray-400 mt-4">{isTiming ? 'Timing...' : 'Tap to start'}</p>
           )}
 
-          {(isPRMode || isDurationBased) && (
+          {isPRMode && (
              <div 
                 className="absolute bottom-4 w-full max-w-xs" 
                 onMouseDown={stopPropagation} onTouchStart={stopPropagation}
